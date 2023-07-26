@@ -92,9 +92,12 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "<h1>Hello from Go!</h1>")
-	http.HandleFunc("api/img2color", handleImageColor)
+	// Directly call the handleImageColor function here
+	handleImageColor(w, r)
+}
 
+// Optional: You can keep the main function if you need to run the server locally
+func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -106,4 +109,3 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("启动服务器时出错：%v\n", err)
 	}
 }
-
