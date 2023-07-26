@@ -92,7 +92,7 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	http.HandleFunc("/img2color", handleImageColor)
+	http.HandleFunc("/", handleImageColor)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -105,3 +105,4 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("启动服务器时出错：%v\n", err)
 	}
 }
+
