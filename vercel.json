@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "img2color",
-      "use": "@vercel/go"
-    }
-  ],
   "routes": [
     {
       "src": "/img2color",
