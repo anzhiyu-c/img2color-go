@@ -1,21 +1,86 @@
-package handler
+package main
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image"
+	"strconv"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/chai2010/webp"
+	"github.com/go-redis/redis/v8" // Import the Redis client package
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/nfnt/resize"
+	"golang.org/x/net/context"
+	"github.com/joho/godotenv"
 )
+var redisClient *redis.Client
+var cacheEnabled bool
+var redisDB int
+var ctx = context.Background()
+
+func init() {
+	// Load environment variables from the .env file in the root directory
+	// You need to get the absolute path to the root directory first
+	rootDir, err := filepath.Abs("..") // Assuming "api" is a subdirectory of the root
+	if err != nil {
+		fmt.Printf("Error getting root directory path: %v\n", err)
+		return
+	}
+
+	envFile := filepath.Join(rootDir, ".env")
+	err = godotenv.Load(envFile)
+	if err != nil {
+		fmt.Printf("Error loading .env file: %v\n", err)
+	}
+
+	// Retrieve Redis address, password, and database from environment variables
+	redisAddr := os.Getenv("REDIS_ADDRESS")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	cacheEnabledStr := os.Getenv("CACHE_ENABLED")
+	redisDBStr := os.Getenv("REDIS_DB")
+
+	// Parse the Redis database number from the environment variable
+	redisDB, err = strconv.Atoi(redisDBStr)
+	if err != nil {
+		redisDB = 0 // Default to DB 0 if the environment variable is not set or invalid
+	}
+
+	// Create the Redis client with the provided address, password, and database
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: redisPassword,
+		DB:       redisDB,
+	})
+
+	// Check if caching is enabled in the .env file
+	cacheEnabled = cacheEnabledStr == "true"
+}
+
+func calculateMD5Hash(data []byte) string {
+	hash := md5.Sum(data)
+	return base64.StdEncoding.EncodeToString(hash[:])
+}
 
 func extractMainColor(imgURL string) (string, error) {
+	// Calculate the MD5 hash of the image URL to use as a cache key
+	md5Hash := calculateMD5Hash([]byte(imgURL))
+
+	// Check if the result is already in the cache
+	if cacheEnabled && redisClient != nil {
+		cachedColor, err := redisClient.Get(ctx, md5Hash).Result()
+		if err == nil && cachedColor != "" {
+			return cachedColor, nil
+		}
+	}
+
 	// 通过HTTP获取图片
 	resp, err := http.Get(imgURL)
 	if err != nil {
@@ -44,7 +109,6 @@ func extractMainColor(imgURL string) (string, error) {
 	// 缩小图片以提高处理速度
 	img = resize.Resize(50, 0, img, resize.Lanczos3)
 
-
 	// 获取图片的主色调
 	bounds := img.Bounds()
 	var r, g, b uint32
@@ -65,7 +129,17 @@ func extractMainColor(imgURL string) (string, error) {
 
 	mainColor := colorful.Color{float64(averageR) / 0xFFFF, float64(averageG) / 0xFFFF, float64(averageB) / 0xFFFF}
 
-	return mainColor.Hex(), nil
+	colorHex := mainColor.Hex()
+
+	// Store the result in the cache if caching is enabled and Redis is available
+	if cacheEnabled && redisClient != nil {
+		_, err := redisClient.Set(ctx, md5Hash, colorHex, 0).Result()
+		if err != nil {
+			fmt.Printf("Error storing result in cache: %v\n", err)
+		}
+	}
+
+	return colorHex, nil
 }
 
 func handleImageColor(w http.ResponseWriter, r *http.Request) {
@@ -96,8 +170,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	handleImageColor(w, r)
 }
 
-// Optional: You can keep the main function if you need to run the server locally
 func main() {
+	http.HandleFunc("/api", Handler)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
