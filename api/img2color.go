@@ -91,17 +91,21 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func main() {
-	http.HandleFunc("/img2color", handleImageColor)
+func StartServer() {
+	http.HandleFunc("/api", handleImageColor)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
-	fmt.Printf("服务器监听在：%s...\n", port) // Remove the extra period here
+	fmt.Printf("服务器监听在：%s...\n", port)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		fmt.Printf("启动服务器时出错：%v\n", err)
 	}
+}
+
+func main() {
+	StartServer()
 }
