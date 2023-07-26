@@ -92,7 +92,7 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	http.HandleFunc("/", handleImageColor)
+	http.HandleFunc("/api/img2color", handleImageColor)
 
 	port := os.Getenv("PORT")
 	if port == "" {
