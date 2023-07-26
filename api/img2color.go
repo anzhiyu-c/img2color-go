@@ -143,6 +143,16 @@ func extractMainColor(imgURL string) (string, error) {
 }
 
 func handleImageColor(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers to allow requests from all domains
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
+
+	// Handle preflight requests (OPTIONS method)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	imgURL := r.URL.Query().Get("img")
 	if imgURL == "" {
 		http.Error(w, "缺少img参数", http.StatusBadRequest)
