@@ -8,8 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api",
-      "dest": "api/img2color"
+      "src": "/api/img2color",
+      "dest": "img2color"
     }
   ]
 }
