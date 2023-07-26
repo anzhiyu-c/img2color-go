@@ -91,13 +91,27 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func main() {
-	http.HandleFunc("/", handleImageColor)
+func Handler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api" {
+		http.NotFound(w, r)
+		return
+	}
 
+	switch r.Method {
+	case "GET":
+		handleImageColor(w, r)
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
+
+	http.HandleFunc("/", Handler)
 
 	fmt.Printf("服务器监听在：%s...\n", port)
 	err := http.ListenAndServe(":"+port, nil)
