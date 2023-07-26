@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/chai2010/webp"
 	"github.com/go-redis/redis/v8" // 导入Redis客户端包
