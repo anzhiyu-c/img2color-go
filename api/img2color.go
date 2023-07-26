@@ -1,4 +1,4 @@
-package handler
+package main
 
 import (
 	"encoding/json"
@@ -91,7 +91,7 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func StartServer() {
+func main() {
 	http.HandleFunc("/api", handleImageColor)
 
 	port := os.Getenv("PORT")
@@ -104,8 +104,4 @@ func StartServer() {
 	if err != nil {
 		fmt.Printf("启动服务器时出错：%v\n", err)
 	}
-}
-
-func Handler() {
-	StartServer()
 }
