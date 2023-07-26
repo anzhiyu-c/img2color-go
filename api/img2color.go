@@ -6,62 +6,85 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"strconv"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/chai2010/webp"
-	"github.com/go-redis/redis/v8" // Import the Redis client package
+	"github.com/go-redis/redis/v8" // 导入Redis客户端包
+	"github.com/joho/godotenv"
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/nfnt/resize"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
-	"github.com/joho/godotenv"
 )
+
 var redisClient *redis.Client
+var mongoClient *mongo.Client
 var cacheEnabled bool
+var useMongoDB bool
 var redisDB int
+var mongoDB string
 var ctx = context.Background()
 
 func init() {
-	// Load environment variables from the .env file in the root directory
-	// You need to get the absolute path to the root directory first
-	rootDir, err := filepath.Abs("..") // Assuming "api" is a subdirectory of the root
+	// 从根目录中的.env文件加载环境变量
+	// 首先需要获取到根目录的绝对路径
+	rootDir, err := filepath.Abs("..") // 假设"api"是根目录的子目录
 	if err != nil {
-		fmt.Printf("Error getting root directory path: %v\n", err)
+		fmt.Printf("获取根目录路径时出错：%v\n", err)
 		return
 	}
 
 	envFile := filepath.Join(rootDir, ".env")
 	err = godotenv.Load(envFile)
 	if err != nil {
-		fmt.Printf("Error loading .env file: %v\n", err)
+		fmt.Printf("加载.env文件时出错：%v\n", err)
 	}
 
-	// Retrieve Redis address, password, and database from environment variables
+	// 从环境变量中获取Redis和MongoDB的配置
 	redisAddr := os.Getenv("REDIS_ADDRESS")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
-	cacheEnabledStr := os.Getenv("CACHE_ENABLED")
+	cacheEnabledStr := os.Getenv("USE_REDIS_CACHE")
 	redisDBStr := os.Getenv("REDIS_DB")
+	mongoDB = os.Getenv("MONGO_DB")
+	mongoURI := os.Getenv("MONGO_URI")
 
-	// Parse the Redis database number from the environment variable
+	// 从环境变量中解析Redis数据库编号
 	redisDB, err = strconv.Atoi(redisDBStr)
 	if err != nil {
-		redisDB = 0 // Default to DB 0 if the environment variable is not set or invalid
+		redisDB = 0 // 如果环境变量未设置或无效，则默认使用DB 0
 	}
 
-	// Create the Redis client with the provided address, password, and database
+	// 使用提供的地址、密码和数据库创建Redis客户端
 	redisClient = redis.NewClient(&redis.Options{
 		Addr:     redisAddr,
 		Password: redisPassword,
 		DB:       redisDB,
 	})
 
-	// Check if caching is enabled in the .env file
+	// 检查缓存是否在.env文件中启用
 	cacheEnabled = cacheEnabledStr == "true"
+
+	// 检查是否应使用MongoDB
+	useMongoDBStr := os.Getenv("USE_MONGODB")
+	useMongoDB = useMongoDBStr == "true"
+	if useMongoDB {
+		log.Println("连接到MongoDB...")
+		clientOptions := options.Client().ApplyURI(mongoURI)
+		mongoClient, err = mongo.Connect(ctx, clientOptions)
+		if err != nil {
+			log.Fatalf("连接到MongoDB时出错：%v", err)
+		}
+		log.Println("已连接到MongoDB！")
+	}
 }
 
 func calculateMD5Hash(data []byte) string {
@@ -70,10 +93,10 @@ func calculateMD5Hash(data []byte) string {
 }
 
 func extractMainColor(imgURL string) (string, error) {
-	// Calculate the MD5 hash of the image URL to use as a cache key
+	// 计算图像URL的MD5哈希作为缓存键
 	md5Hash := calculateMD5Hash([]byte(imgURL))
 
-	// Check if the result is already in the cache
+	// 检查结果是否已在缓存中
 	if cacheEnabled && redisClient != nil {
 		cachedColor, err := redisClient.Get(ctx, md5Hash).Result()
 		if err == nil && cachedColor != "" {
@@ -81,14 +104,14 @@ func extractMainColor(imgURL string) (string, error) {
 		}
 	}
 
-	// 通过HTTP获取图片
+	// 通过HTTP获取图像
 	resp, err := http.Get(imgURL)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	// 将图片解码为image.Image
+	// 将图像解码为image.Image类型
 	var img image.Image
 	switch resp.Header.Get("Content-Type") {
 	case "image/jpeg":
@@ -97,19 +120,19 @@ func extractMainColor(imgURL string) (string, error) {
 		img, err = png.Decode(resp.Body)
 	case "image/gif":
 		img, err = gif.Decode(resp.Body)
-	case "image/webp": // Handle WebP format using the webp package
+	case "image/webp": // 使用webp包处理WebP格式
 		img, err = webp.Decode(resp.Body)
 	default:
-		err = fmt.Errorf("unknown image format")
+		err = fmt.Errorf("未知的图像格式")
 	}
 	if err != nil {
 		return "", err
 	}
 
-	// 缩小图片以提高处理速度
+	// 调整图像大小以加快处理速度
 	img = resize.Resize(50, 0, img, resize.Lanczos3)
 
-	// 获取图片的主色调
+	// 获取图像的主色调
 	bounds := img.Bounds()
 	var r, g, b uint32
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
@@ -127,15 +150,27 @@ func extractMainColor(imgURL string) (string, error) {
 	averageG := g / totalPixels
 	averageB := b / totalPixels
 
-	mainColor := colorful.Color{float64(averageR) / 0xFFFF, float64(averageG) / 0xFFFF, float64(averageB) / 0xFFFF}
+	mainColor := colorful.Color{R: float64(averageR) / 0xFFFF, G: float64(averageG) / 0xFFFF, B: float64(averageB) / 0xFFFF}
 
 	colorHex := mainColor.Hex()
 
-	// Store the result in the cache if caching is enabled and Redis is available
+	// 如果缓存已启用且Redis可用，则将结果存储在缓存中
 	if cacheEnabled && redisClient != nil {
 		_, err := redisClient.Set(ctx, md5Hash, colorHex, 0).Result()
 		if err != nil {
-			fmt.Printf("Error storing result in cache: %v\n", err)
+			log.Printf("将结果存储在缓存中时出错：%v\n", err)
+		}
+	}
+
+	// 如果启用了MongoDB，则将结果存储在其中
+	if useMongoDB && mongoClient != nil {
+		collection := mongoClient.Database(mongoDB).Collection("colors")
+		_, err := collection.InsertOne(ctx, bson.M{
+			"url":   imgURL,
+			"color": colorHex,
+		})
+		if err != nil {
+			log.Printf("将结果存储在MongoDB中时出错：%v\n", err)
 		}
 	}
 
@@ -176,7 +211,7 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	// Directly call the handleImageColor function here
+	// 直接在此处调用handleImageColor函数
 	handleImageColor(w, r)
 }
 
@@ -188,9 +223,9 @@ func main() {
 		port = "3000"
 	}
 
-	fmt.Printf("服务器监听在：%s...\n", port)
+	log.Printf("服务器监听在：%s...\n", port)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		fmt.Printf("启动服务器时出错：%v\n", err)
+		log.Fatalf("启动服务器时出错：%v\n", err)
 	}
 }
