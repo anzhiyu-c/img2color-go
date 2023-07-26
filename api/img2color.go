@@ -178,12 +178,27 @@ func extractMainColor(imgURL string) (string, error) {
 }
 
 func handleImageColor(w http.ResponseWriter, r *http.Request) {
-	// Set CORS headers to allow requests from all domains
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization")
+	// 从.env文件中获取referer配置
+	refererConfig := os.Getenv("ALLOWED_REFERER")
 
-	// Handle preflight requests (OPTIONS method)
+	// 检查请求的Referer是否在配置的白名单中
+	referer := r.Header.Get("Referer")
+	if refererConfig != "" && referer != "" {
+		allowedReferers := strings.Split(refererConfig, ",")
+		allowed := false
+		for _, allowedReferer := range allowedReferers {
+			if strings.TrimSpace(allowedReferer) == referer {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			http.Error(w, "禁止的跨域请求", http.StatusForbidden)
+			return
+		}
+	}
+
+	// 处理预检请求 (选项方法)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
