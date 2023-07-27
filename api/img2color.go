@@ -1,4 +1,4 @@
-package handler
+package main
 
 import (
 	"crypto/md5"
@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/chai2010/webp"
 	"github.com/go-redis/redis/v8" // 导入Redis客户端包
@@ -36,18 +35,21 @@ var mongoDB string
 var ctx = context.Background()
 
 func init() {
-	// 从根目录中的.env文件加载环境变量
-	// 首先需要获取到根目录的绝对路径
-	rootDir, err := filepath.Abs("..") // 假设"api"是根目录的子目录
+	// 获取当前工作目录的绝对路径
+	currentDir, err := os.Getwd()
 	if err != nil {
-		fmt.Printf("获取根目录路径时出错：%v\n", err)
+		fmt.Printf("获取当前工作目录路径时出错：%v\n", err)
 		return
 	}
 
-	envFile := filepath.Join(rootDir, ".env")
+	// 构建 .env 文件的完整路径
+	envFile := filepath.Join(currentDir, ".env")
+
+	// 从 .env 文件加载环境变量
 	err = godotenv.Load(envFile)
 	if err != nil {
-		fmt.Printf("加载.env文件时出错：%v\n", err)
+		fmt.Printf("加载 .env 文件时出错：%v\n", err)
+		return
 	}
 
 	// 从环境变量中获取Redis和MongoDB的配置
@@ -179,25 +181,11 @@ func extractMainColor(imgURL string) (string, error) {
 }
 
 func handleImageColor(w http.ResponseWriter, r *http.Request) {
-	// 从.env文件中获取referer配置
-	refererConfig := os.Getenv("ALLOWED_REFERER")
+	// 设置CORS头，允许所有来源访问
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Referer")
 
-	// 检查请求的Referer是否在配置的白名单中
-	referer := r.Header.Get("Referer")
-	if refererConfig != "" && referer != "" {
-		allowedReferers := strings.Split(refererConfig, ",")
-		allowed := false
-		for _, allowedReferer := range allowedReferers {
-			if strings.TrimSpace(allowedReferer) == referer {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			http.Error(w, "禁止的跨域请求", http.StatusForbidden)
-			return
-		}
-	}
 
 	// 处理预检请求 (选项方法)
 	if r.Method == http.MethodOptions {
