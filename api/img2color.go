@@ -19,7 +19,6 @@ import (
 	"github.com/go-redis/redis/v8" // 导入Redis客户端包
 	"github.com/joho/godotenv"
 	"github.com/lucasb-eyer/go-colorful"
-	"github.com/nfnt/resize"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -33,6 +32,7 @@ var useMongoDB bool
 var redisDB int
 var mongoDB string
 var ctx = context.Background()
+var colorsCollection *mongo.Collection
 
 func init() {
 	// 获取当前工作目录的绝对路径
@@ -87,6 +87,9 @@ func init() {
 			log.Fatalf("连接到MongoDB时出错：%v", err)
 		}
 		log.Println("已连接到MongoDB！")
+
+		// 创建颜色集合
+		colorsCollection = mongoClient.Database(mongoDB).Collection("colors")
 	}
 }
 
@@ -166,9 +169,8 @@ func extractMainColor(imgURL string) (string, error) {
 	}
 
 	// 如果启用了MongoDB，则将结果存储在其中
-	if useMongoDB && mongoClient != nil {
-		collection := mongoClient.Database(mongoDB).Collection("colors")
-		_, err := collection.InsertOne(ctx, bson.M{
+	if useMongoDB && colorsCollection != nil {
+		_, err := colorsCollection.InsertOne(ctx, bson.M{
 			"url":   imgURL,
 			"color": colorHex,
 		})
@@ -186,12 +188,12 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Referer")
 
-
 	// 处理预检请求 (选项方法)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+
 	imgURL := r.URL.Query().Get("img")
 	if imgURL == "" {
 		http.Error(w, "缺少img参数", http.StatusBadRequest)
