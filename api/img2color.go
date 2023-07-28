@@ -19,6 +19,7 @@ import (
 	"github.com/go-redis/redis/v8" // 导入Redis客户端包
 	"github.com/joho/godotenv"
 	"github.com/lucasb-eyer/go-colorful"
+	"github.com/nfnt/resize"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
