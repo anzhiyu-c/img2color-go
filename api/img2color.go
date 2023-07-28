@@ -13,7 +13,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/chai2010/webp"
 	"github.com/go-redis/redis/v8" // 导入Redis客户端包
@@ -34,6 +36,7 @@ var redisDB int
 var mongoDB string
 var ctx = context.Background()
 var colorsCollection *mongo.Collection
+var allowedReferers []string
 
 func init() {
 	// 获取当前工作目录的绝对路径
@@ -60,6 +63,7 @@ func init() {
 	redisDBStr := os.Getenv("REDIS_DB")
 	mongoDB = os.Getenv("MONGO_DB")
 	mongoURI := os.Getenv("MONGO_URI")
+	referers := os.Getenv("ALLOWED_REFERERS")
 
 	// 从环境变量中解析Redis数据库编号
 	redisDB, err = strconv.Atoi(redisDBStr)
@@ -92,6 +96,9 @@ func init() {
 		// 创建颜色集合
 		colorsCollection = mongoClient.Database(mongoDB).Collection("colors")
 	}
+
+	// 解析允许的Referers
+	allowedReferers = parseReferers(referers)
 }
 
 func calculateMD5Hash(data []byte) string {
@@ -195,6 +202,13 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检查Referer是否允许访问
+	referer := r.Header.Get("Referer")
+	if !isRefererAllowed(referer) {
+		http.Error(w, "禁止访问", http.StatusForbidden)
+		return
+	}
+
 	imgURL := r.URL.Query().Get("img")
 	if imgURL == "" {
 		http.Error(w, "缺少img参数", http.StatusBadRequest)
@@ -220,6 +234,33 @@ func handleImageColor(w http.ResponseWriter, r *http.Request) {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// 直接在此处调用handleImageColor函数
 	handleImageColor(w, r)
+}
+
+// parseReferers解析允许的Referers
+func parseReferers(referers string) []string {
+	refererList := strings.Split(referers, ",")
+	for i, referer := range refererList {
+		refererList[i] = strings.TrimSpace(referer)
+	}
+	return refererList
+}
+
+// isRefererAllowed检查给定的Referer是否允许访问
+func isRefererAllowed(referer string) bool {
+	if len(allowedReferers) == 0 {
+		return true
+	}
+
+	for _, allowedReferer := range allowedReferers {
+		allowedReferer = strings.ReplaceAll(allowedReferer, ".", "\\.")
+		allowedReferer = strings.ReplaceAll(allowedReferer, "*", ".*")
+		match, _ := regexp.MatchString(allowedReferer, referer)
+		if match {
+			return true
+		}
+	}
+
+	return false
 }
 
 func main() {
