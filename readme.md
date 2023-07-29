@@ -41,12 +41,14 @@ go run /api/img2color.go
 .env文件配置说明
 
 
-REDIS_ADDRESS=${REDIS_ADDRESS}  REDIS地址
-REDIS_PASSWORD=${REDIS_PASSWORD}    REDIS密码
-USE_REDIS_CACHE=${USE_REDIS_CACHE}  bool值，是否启用REDIS
-REDIS_DB=${REDIS_DB}    REDIS数据库名
-USE_MONGODB=${USE_MONGODB}  bool值，是否启用mongodb
-MONGO_URI=${MONGO_URI}  mongodb地址
-MONGO_DB=${MONGO_DB}    mongodb数据库名
-PORT=${PORT} 端口
-ALLOWED_REFERERS=${ALLOWED_REFERERS} 允许的refer域名，支持通配符，如果有多个地址可以用英文半角,隔开
+| 配置项                  | 说明                                 |
+|-------------------------|--------------------------------------|
+| REDIS_ADDRESS           | REDIS地址                            |
+| REDIS_PASSWORD          | REDIS密码                            |
+| USE_REDIS_CACHE         | bool值，是否启用REDIS                 |
+| REDIS_DB                | REDIS数据库名                        |
+| USE_MONGODB             | bool值，是否启用mongodb               |
+| MONGO_URI               | mongodb地址                          |
+| MONGO_DB                | mongodb数据库名                      |
+| PORT                    | 端口                                 |
+| ALLOWED_REFERERS        | 允许的refer域名，支持通配符，如果有多个地址可以用英文半角,隔开 |
