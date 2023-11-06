@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -17,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chai2010/webp"
 	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/nfnt/resize"
+	"github.com/disintegration/imaging"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -121,18 +118,9 @@ func extractMainColor(imgURL string) (string, error) {
 	defer resp.Body.Close()
 
 	var img image.Image
-	switch resp.Header.Get("Content-Type") {
-	case "image/jpeg":
-		img, err = jpeg.Decode(resp.Body)
-	case "image/png":
-		img, err = png.Decode(resp.Body)
-	case "image/gif":
-		img, err = gif.Decode(resp.Body)
-	case "image/webp":
-		img, err = webp.Decode(resp.Body)
-	default:
-		err = fmt.Errorf("未知的图像格式")
-	}
+
+	img, err = imaging.Decode(resp.Body)
+
 	if err != nil {
 		return "", err
 	}
