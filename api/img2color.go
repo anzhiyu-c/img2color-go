@@ -70,6 +70,12 @@ func init() {
 		DB:       redisDB,
 	})
 
+	pong, err := redisClient.Ping(ctx).Result()
+	if err != nil {
+		log.Fatalf("连接到Redis时出错：%v", err)
+	}
+	log.Println(pong)
+
 	cacheEnabled = cacheEnabledStr == "true"
 
 	useMongoDBStr := os.Getenv("USE_MONGODB")
