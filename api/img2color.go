@@ -14,14 +14,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/disintegration/imaging"
 	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/nfnt/resize"
-	"github.com/disintegration/imaging"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/image/webp" // webp格式
 	"golang.org/x/net/context"
 )
 
@@ -119,7 +120,14 @@ func extractMainColor(imgURL string) (string, error) {
 
 	var img image.Image
 
-	img, err = imaging.Decode(resp.Body)
+	contentType := resp.Header.Get("Content-Type")
+	switch contentType {
+	// imaging不支持webp处理，将其改用webp
+	case "image/webp":
+		img, err = webp.Decode(resp.Body)
+	default:
+		img, err = imaging.Decode(resp.Body)
+	}
 
 	if err != nil {
 		return "", err
